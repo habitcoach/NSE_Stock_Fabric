@@ -1,0 +1,78 @@
+table stockconsolidation
+	lineageTag: fa9ab2e8-94cc-449e-be48-f0c97faaf465
+	sourceLineageTag: [dbo].[stockconsolidation]
+
+	column instrument_key
+		dataType: string
+		sourceProviderType: varchar(8000)
+		lineageTag: eff59ad7-00bd-47e7-bbca-abe4237757a2
+		sourceLineageTag: instrument_key
+		summarizeBy: none
+		sourceColumn: instrument_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column stock_name
+		dataType: string
+		sourceProviderType: varchar(8000)
+		lineageTag: 1874ae5d-ef5e-4366-8bae-0616a1f84a9d
+		sourceLineageTag: stock_name
+		summarizeBy: none
+		sourceColumn: stock_name
+
+		annotation SummarizationSetBy = Automatic
+
+	column rolling_range_pct
+		dataType: double
+		sourceProviderType: float
+		lineageTag: 149d5140-788c-4034-a790-ee083ed76bd4
+		sourceLineageTag: rolling_range_pct
+		summarizeBy: sum
+		sourceColumn: rolling_range_pct
+
+		annotation SummarizationSetBy = Automatic
+
+		annotation PBI_FormatHint = {"isGeneralNumber":true}
+
+	column zone_id
+		dataType: int64
+		formatString: 0
+		sourceProviderType: bigint
+		lineageTag: 210f0906-4908-4f52-a407-041541d106b6
+		sourceLineageTag: zone_id
+		summarizeBy: sum
+		sourceColumn: zone_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column zone_end_date
+		dataType: dateTime
+		formatString: General Date
+		sourceProviderType: date
+		lineageTag: 98ae3ee0-9953-4dbd-837c-caf13ee13ac0
+		sourceLineageTag: zone_end_date
+		summarizeBy: none
+		sourceColumn: zone_end_date
+
+		annotation SummarizationSetBy = Automatic
+
+	column rows_in_window
+		dataType: int64
+		formatString: 0
+		sourceProviderType: bigint
+		lineageTag: bf1d7d56-14df-4209-b2f2-432a1d45f8ef
+		sourceLineageTag: rows_in_window
+		summarizeBy: sum
+		sourceColumn: rows_in_window
+
+		annotation SummarizationSetBy = Automatic
+
+	partition stockconsolidation = entity
+		mode: directLake
+		source
+			entityName: stockconsolidation
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+
+	annotation PBI_ResultType = Table
+
