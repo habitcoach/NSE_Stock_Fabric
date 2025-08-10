@@ -46,7 +46,7 @@ def process_stock(instrument_key: str, stock_name: str, stock_from_date: str, st
         # Step 1: Call the Upstox API
         url = f"https://api.upstox.com/v3/historical-candle/{instrument_key}/days/1/{stock_to_date}/{stock_from_date}"
         headers = {
-            "Authorization": "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2ODg4OGQ0YjNjY2Q4ZjU1ZDM2MWI0M2EiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1Mzc3OTUzMSwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzUzODI2NDAwfQ.LET0EF7GsZ8Os6exSabBv5hI2CCA1JtOuAp_lc6YPA0"  # Replace with your actual token
+            "Authorization": "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2ODhkOWZlYTk4YzE0ZTE1Y2NkZWE4M2QiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NDExMTk3OCwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU0MTcyMDAwfQ.eCqdXC-sPy9UnAUuNJTCrWZuLo3uKlq0rU0J7UELhwc"  # Replace with your actual token
         }
         response = requests.get(url, headers=headers)
         json_data = response.json()
@@ -65,6 +65,7 @@ def process_stock(instrument_key: str, stock_name: str, stock_from_date: str, st
         df = spark.createDataFrame(candles, schema)
         df = df.withColumn("datetime", to_timestamp("datetime"))
         df = df.withColumn("datetime_ist", date_add(col("datetime"), 1))
+       # display(df)
 
         # Step 3: Calculate Rolling Stats
         windowSpec_30 = Window.orderBy("datetime_ist").rowsBetween(-29, 0)
@@ -81,11 +82,12 @@ def process_stock(instrument_key: str, stock_name: str, stock_from_date: str, st
         df = df.withColumn("avg_volume_30", avg("volume").over(windowSpec_30))
         df = df.withColumn("avg_volume_5", avg("volume").over(windowSpec_5))
         df = df.withColumn("volume_ratio", col("avg_volume_5") / col("avg_volume_30"))
-
+        #display(df)
         # Step 4: Filter for Consolidation
         consolidation_df = df.filter(
             (col("rolling_range_pct") <= 5) & (col("rows_in_window") == 30)
         )
+        #display(df)
 
         # Step 5: Detect Zone Changes
         consolidation_df = consolidation_df.withColumn("date", to_date("datetime_ist"))
@@ -182,30 +184,23 @@ if results:
     "zone_end_date",
     "rows_in_window"
 )
+    # Get today's date in yyyyMMdd format
+    today_date = datetime.today().strftime('%Y%m%d')
+
+    # Create a dynamic table name with date suffix
+    table_name = f"StockCon_{today_date}"
 
     finalzonestoc.write \
     .format("delta") \
     .mode("overwrite") \
     .option("mergeSchema", "true") \
-    .saveAsTable("StockConsolidation")
+    .saveAsTable(table_name)
 
     display(finalzonestoc)
     print("✅ Successfully saved to table: StockConsolidation")
 else:
     print("⚠️ No results to save.")
 
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
-df = spark.sql("SELECT * FROM stklakehouse.stockconsolidation LIMIT 1000")
-display(df)
 
 # METADATA ********************
 
