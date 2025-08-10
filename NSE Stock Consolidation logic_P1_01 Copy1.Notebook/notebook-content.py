@@ -154,7 +154,7 @@ def process_stock(instrument_key: str, stock_name: str, stock_from_date: str, st
         # Step 1: Call the Upstox API
         url = f"https://api.upstox.com/v3/historical-candle/{instrument_key}/days/1/{stock_to_date}/{stock_from_date}"
         headers = {
-            "Authorization": "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2ODk2ZDAyNmUxYzg2NTY1NzcwZWE3ODUiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NDcxNDE1MCwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU0Nzc2ODAwfQ.pVTMdTx_CitFSacjU9z-P0cet_KbWZtktYevtP8YMgw"  # Replace with your actual token
+            "Authorization": "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2ODk4MWQwNjgxMDU5MTUwYjQzZDUwN2QiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NDc5OTM2NiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU0ODYzMjAwfQ.kqmd9GtRLhckGQsfPp5_U5qwGOcmtB2kVdP6xa2SyMI"  # Replace with your actual token
         }
         response = requests.get(url, headers=headers)
         json_data = response.json()
@@ -319,7 +319,7 @@ import pytz  # ✅ For IST timezone support
 import time  # ✅ For handling delay
 
 # Step 1: Load stocks from the table
-stock_list_df = spark.read.table("nse_symbol_inst")
+stock_list_df = spark.read.table("nse_symbol_inst") #add limit here for test
 print(f"Total stocks to process: {stock_list_df.count()}")
 
 stock_tuples = [(row['instrument_key'], row['name']) for row in stock_list_df.collect()]
@@ -328,7 +328,7 @@ stock_tuples = [(row['instrument_key'], row['name']) for row in stock_list_df.co
 ist = pytz.timezone('Asia/Kolkata')
 current_ist = datetime.now(ist)
 stock_to_date = current_ist.strftime('%Y-%m-%d')
-stock_from_date = (current_ist - timedelta(days=548)).strftime('%Y-%m-%d')
+stock_from_date = (current_ist - timedelta(days=1460)).strftime('%Y-%m-%d')
 
 print(f"Date range set from {stock_from_date} to {stock_to_date}")
 
@@ -408,18 +408,6 @@ else:
 # META   "language_group": "synapse_pyspark"
 # META }
 
-# CELL ********************
-
-df = spark.sql("SELECT * FROM stklakehouse.stockcontest_20250809 LIMIT 1000")
-display(df)
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
 # MARKDOWN ********************
 
 # ### Stocks Eval
@@ -434,14 +422,14 @@ import time
 # -------------------
 # CONFIG
 # -------------------
-API_TOKEN = "YOUR_API_TOKEN"  # Replace with your token
+API_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2ODk4MWQwNjgxMDU5MTUwYjQzZDUwN2QiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NDc5OTM2NiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU0ODYzMjAwfQ.kqmd9GtRLhckGQsfPp5_U5qwGOcmtB2kVdP6xa2SyMI"  # Replace with your token
 BASE_URL = "https://api.upstox.com/v3/historical-candle"
 MAX_CALLS_PER_MIN = 10  # Adjust to your API rate limit
 
 # -------------------
 # Load source data
 # -------------------
-df = spark.sql("""
+df = spark.sql(f"""
     SELECT 
         stock_name,
         rolling_range_pct_30days,
@@ -453,8 +441,9 @@ df = spark.sql("""
         zone_id,
         zone_end_date,
         instrument_key
-    FROM stklakehouse.stockcontest_20250809
+    FROM stklakehouse.{table_name}
 """)
+
 
 # -------------------
 # Helper: API Call
