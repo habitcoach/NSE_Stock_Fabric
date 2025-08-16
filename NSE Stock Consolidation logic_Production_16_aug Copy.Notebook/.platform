@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
     "type": "Notebook",
-    "displayName": "NSE Stock Consolidation logic_Production",
+    "displayName": "NSE Stock Consolidation logic_Production_16_aug Copy",
     "description": "New notebook"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "0418e17e-06ea-90a0-4b6a-4b3d93b1f1a1"
+    "logicalId": "09f8fde5-3232-a90e-4e4e-6406f2e38f31"
   }
 }

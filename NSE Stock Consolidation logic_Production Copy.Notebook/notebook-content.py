@@ -154,7 +154,7 @@ def process_stock(instrument_key: str, stock_name: str, stock_from_date: str, st
         # Step 1: Call the Upstox API
         url = f"https://api.upstox.com/v3/historical-candle/{instrument_key}/days/1/{stock_to_date}/{stock_from_date}"
         headers = {
-            "Authorization": "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2ODk4MWQwNjgxMDU5MTUwYjQzZDUwN2QiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NDc5OTM2NiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU0ODYzMjAwfQ.kqmd9GtRLhckGQsfPp5_U5qwGOcmtB2kVdP6xa2SyMI"  # Replace with your actual token
+            "Authorization": "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2OGEwNjAwMDcxMDE2ZTI0OTlkNTA2YzIiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NTM0MDgwMCwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU1MzgxNjAwfQ.aI6vuIuuFZcTv0FygD89EyucVDYC3Gv-hwTtOGUqX_U"  # Replace with your actual token
         }
         response = requests.get(url, headers=headers)
         json_data = response.json()
@@ -422,7 +422,7 @@ import time
 # -------------------
 # CONFIG
 # -------------------
-API_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2ODk4MWQwNjgxMDU5MTUwYjQzZDUwN2QiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NDc5OTM2NiwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU0ODYzMjAwfQ.kqmd9GtRLhckGQsfPp5_U5qwGOcmtB2kVdP6xa2SyMI"  # Replace with your token
+API_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2OGEwNjAwMDcxMDE2ZTI0OTlkNTA2YzIiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NTM0MDgwMCwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU1MzgxNjAwfQ.aI6vuIuuFZcTv0FygD89EyucVDYC3Gv-hwTtOGUqX_U"  # Replace with your token
 BASE_URL = "https://api.upstox.com/v3/historical-candle"
 MAX_CALLS_PER_MIN = 10  # Adjust to your API rate limit
 
@@ -565,6 +565,187 @@ display(
     "profit_from_10000"
     )
 )
+
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# MARKDOWN ********************
+
+# # Scoring
+# 
+# ## Success_Flag — Yes/No Criteria
+# 
+# The Success_Flag marks a trade as “Yes” when it meets all of the following factor conditions observed in historically strong trades:
+# 
+# ROC (Rate of Change) between 1% and 2% over the past 14 days — indicates moderate upward momentum without overextension.
+# 
+# RSI (Relative Strength Index) above 50 — price is in bullish territory, but not necessarily overheated.
+# 
+# MACD Histogram label is Positive (Bullish) — short-term momentum is above long-term momentum.
+# 
+# Volume Ratio (5-day avg / 30-day avg) greater than 1 — recent trading activity is higher than the monthly average, showing participation.
+# 
+# Price Band Position above 0.8 — price is trading near the top of its recent Bollinger Band range, indicating strength.
+# 
+# If any of these conditions fail, the Success_Flag is set to “No”.
+# 
+# Success_Rating — Scoring & Grades
+# 
+# The Success_Rating provides a more nuanced score based on how closely a trade matches the “ideal” success profile.
+# 
+# ## Score Components:
+# 
+# ROC score: Highest points for 1–2%, partial for 0–1% or 2–3%, penalties outside range.
+# 
+# RSI score: Bonus for 50–65, smaller for 65–70, penalty if overheated (>70) or weak (<45).
+# 
+# MACD score: Highest for bullish, partial for neutral, penalty for bearish.
+# 
+# Volume Ratio score: Higher points for strong recent volume relative to 30-day average.
+# 
+# Price Band Position score: Highest for >0.8, partial for 0.6–0.8, penalty for mid/bottom ranges unless matching rare successful low-band setups.
+# 
+# Final Score to Rating Mapping:
+# 
+# A – Strong: Score ≥ 70 — multiple confirming signals, historically high probability of success.
+# 
+# B – Good: Score 55–69 — strong setup but missing one or two ideal confirmations.
+# 
+# C – Borderline: Score 40–54 — mixed signals; may succeed in favorable market but less reliable.
+# 
+# D – Weak: Score < 40 — poor alignment with historical success factors; avoid unless exceptional circumstances.
+
+
+# CELL ********************
+
+from pyspark.sql.functions import col, when
+
+# Step 1: Read from your table
+df = spark.sql("""
+    SELECT *
+    FROM stklakehouse.stockcontest_analysis
+    LIMIT 1000
+""")
+
+# Step 2: Add Success_Flag based on your success criteria
+df_with_flag = df.withColumn(
+    "Success_Flag",
+    when(
+        (col("roc") >= 1) & (col("roc") <= 2) &
+        (col("rsi") > 50) &
+        (col("MACD_Histogram_label") == "Positive (Bullish)") &
+        (col("volume_ratio") > 1) &
+        (col("price_band_position") > 0.8),
+        "Yes"
+    ).otherwise("No")
+)
+
+# Step 3: Display the updated DataFrame
+display(df_with_flag)
+
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
+from pyspark.sql import functions as F
+
+scored = (
+    df_with_flag
+    # Normalize MACD label once
+    .withColumn("macd_label_norm", F.lower(F.col("MACD_Histogram_label")))
+    .withColumn("macd_bullish", F.col("macd_label_norm").contains("positive"))
+    .withColumn("macd_neutral", F.col("macd_label_norm").contains("neutral"))
+
+    # ROC score
+    .withColumn(
+        "roc_score",
+        F.when((F.col("roc") >= 1) & (F.col("roc") <= 2), 30)
+         .when((F.col("roc") >= 0) & (F.col("roc") < 1), 15)
+         .when((F.col("roc") > 2) & (F.col("roc") <= 3), 10)
+         .when((F.col("roc") < 0) & (F.col("price_band_position") < 0.15) & (F.col("rsi") < 45), 10)
+         .otherwise(-10)
+    )
+
+    # RSI score
+    .withColumn(
+        "rsi_score",
+        F.when((F.col("rsi") > 50) & (F.col("rsi") <= 65), 15)
+         .when((F.col("rsi") > 65) & (F.col("rsi") <= 70), 8)
+         .when(F.col("rsi") > 70, -5)
+         .when(F.col("rsi") >= 45, 0)
+         .otherwise(-10)
+    )
+
+    # MACD score
+    .withColumn(
+        "macd_score",
+        F.when(F.col("macd_bullish"), 15)
+         .when(F.col("macd_neutral"), 5)
+         .otherwise(-10)
+    )
+
+    # Volume ratio score
+    .withColumn(
+        "volume_score",
+        F.when(F.col("volume_ratio") >= 1.5, 15)
+         .when(F.col("volume_ratio") >= 1.0, 10)
+         .when(F.col("volume_ratio") >= 0.8, 0)
+         .otherwise(-5)
+    )
+
+    # Price band position score
+    .withColumn(
+        "band_score",
+        F.when(F.col("price_band_position") > 0.8, 15)
+         .when((F.col("price_band_position") >= 0.6) & (F.col("price_band_position") <= 0.8), 8)
+         .when((F.col("price_band_position") < 0.15) & (F.col("roc") < 0) & (F.col("rsi") < 45), 10)
+         .otherwise(-10)
+    )
+
+    # Total score
+    .withColumn(
+        "Success_Score_raw",
+        F.col("roc_score") + F.col("rsi_score") + F.col("macd_score")
+        + F.col("volume_score") + F.col("band_score")
+    )
+    .withColumn(
+        "Success_Score",
+        F.round(F.least(F.lit(100.0), F.greatest(F.lit(0.0), F.col("Success_Score_raw"))), 0)
+    )
+    .withColumn(
+        "Success_Rating",
+        F.when(F.col("Success_Score") >= 70, "A - Strong")
+         .when(F.col("Success_Score") >= 55, "B - Good")
+         .when(F.col("Success_Score") >= 40, "C - Borderline")
+         .otherwise("D - Weak")
+    )
+    .drop("macd_label_norm","macd_bullish","macd_neutral")
+)
+
+# Show all original columns + the new scoring columns
+display(scored)
+scored.write.format("delta").mode("overwrite").saveAsTable("stklakehouse.ScoreTable")
+
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
 
 
 # METADATA ********************
