@@ -328,7 +328,7 @@ stock_tuples = [(row['instrument_key'], row['name']) for row in stock_list_df.co
 ist = pytz.timezone('Asia/Kolkata')
 current_ist = datetime.now(ist)
 stock_to_date = current_ist.strftime('%Y-%m-%d')
-stock_from_date = (current_ist - timedelta(days=1460)).strftime('%Y-%m-%d')
+stock_from_date = (current_ist - timedelta(days=100)).strftime('%Y-%m-%d') #3 month
 
 print(f"Date range set from {stock_from_date} to {stock_to_date}")
 
@@ -387,7 +387,7 @@ if results:
 )
 
     # Create a dynamic table name with date suffix
-    table_name = f"StockConTest_{today_date}"
+    table_name = f"StockTest90Days_{today_date}"
 
     finalzonestocWithFlag.write \
     .format("delta") \
@@ -399,172 +399,6 @@ if results:
     print("✅ Successfully saved to table: StockConsolidation")
 else:
     print("⚠️ No results to save.")
-
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# MARKDOWN ********************
-
-# ### Stocks Eval
-
-# CELL ********************
-
-from pyspark.sql import SparkSession
-from datetime import datetime, timedelta, date
-import requests
-import time
-
-# -------------------
-# CONFIG
-# -------------------
-API_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2OGEwNjAwMDcxMDE2ZTI0OTlkNTA2YzIiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NTM0MDgwMCwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU1MzgxNjAwfQ.aI6vuIuuFZcTv0FygD89EyucVDYC3Gv-hwTtOGUqX_U"  # Replace with your token
-BASE_URL = "https://api.upstox.com/v3/historical-candle"
-MAX_CALLS_PER_MIN = 10  # Adjust to your API rate limit
-
-# -------------------
-# Load source data
-# -------------------
-df = spark.sql(f"""
-    SELECT 
-        stock_name,
-        rolling_range_pct_30days,
-        roc,
-        rsi,
-        MACD_Histogram_Label,
-        `volume_ratio_5d/30d` AS volume_ratio,
-        price_band_position,
-        zone_id,
-        zone_end_date,
-        instrument_key
-    FROM stklakehouse.{table_name}
-""")
-
-
-# -------------------
-# Helper: API Call
-# -------------------
-def fetch_prices(instrument_key: str, start_date: str, end_date: str):
-    """Fetch historical OHLC data and return list of close prices."""
-    url = f"{BASE_URL}/{instrument_key}/days/1/{end_date}/{start_date}"
-    headers = {"Authorization": API_TOKEN}
-    try:
-        resp = requests.get(url, headers=headers)
-        data = resp.json()
-        candles = data.get("data", {}).get("candles", [])
-        if candles:
-            closes = [c[4] for c in candles]  # close prices
-            return closes
-        return []
-    except Exception as e:
-        print(f"Error fetching data for {instrument_key}: {e}")
-        return []
-
-# -------------------
-# Process
-# -------------------
-results = []
-call_count = 0
-
-for row in df.collect():
-    # Ensure zone_date is a datetime object
-    if isinstance(row.zone_end_date, str):
-        zone_date = datetime.strptime(row.zone_end_date, "%Y-%m-%d")
-    elif isinstance(row.zone_end_date, date):
-        zone_date = datetime.combine(row.zone_end_date, datetime.min.time())
-    else:
-        zone_date = row.zone_end_date
-
-    stock_name = row.stock_name
-    instrument_key = row.instrument_key
-
-    # API call for next 30 days
-    end_date = zone_date + timedelta(days=30)
-    closes = fetch_prices(
-        instrument_key,
-        zone_date.strftime("%Y-%m-%d"),
-        end_date.strftime("%Y-%m-%d")
-    )
-
-    if not closes:
-        continue  # skip if no data
-
-    entry_close = closes[-1]  # Entry price
-    one_month_close = max(closes)  # Highest close within <=30 days
-
-    pct_change = ((one_month_close - entry_close) / entry_close) * 100
-    profit = (pct_change / 100) * 10000
-
-    results.append({
-        "Zone_end_date": zone_date.strftime("%Y-%m-%d"),
-        "Stock_name": stock_name,
-        "rolling_range_pct_30days": row.rolling_range_pct_30days,
-        "roc": row.roc,
-        "rsi": row.rsi,
-        "MACD_Histogram_label": row.MACD_Histogram_Label,
-        "volume_ratio": row.volume_ratio,
-        "price_band_position": row.price_band_position,
-        "zone_id": row.zone_id,
-        "Entry_close_at_zone_end_date": entry_close,
-        "Possible_exit_one_month": one_month_close,
-        "pct_change_one_month": pct_change,
-        "profit_from_10000": profit
-    })
-
-    # Rate limiting
-    call_count += 1
-    if call_count >= MAX_CALLS_PER_MIN:
-        time.sleep(60)
-        call_count = 0
-
-# -------------------
-# Convert to DataFrame and Arrange Columns
-# -------------------
-final_df = spark.createDataFrame(results)
-
-final_df = final_df.select(
-    "Zone_end_date",
-    "Stock_name",
-    "rolling_range_pct_30days",
-    "roc",
-    "rsi",
-    "MACD_Histogram_label",
-    "volume_ratio",
-    "price_band_position",
-    "zone_id",
-    "Entry_close_at_zone_end_date",
-    "Possible_exit_one_month",
-    "pct_change_one_month",
-    "profit_from_10000"
-)
-
-# -------------------
-# Save to Delta Table
-# -------------------
-final_df.write.format("delta").mode("overwrite").saveAsTable("stklakehouse.stockcontest_analysis")
-
-# Display with pretty aliases
-display(
-    final_df.toDF(
-        "Zone_end_date",
-    "Stock_name",
-    "rolling_range_pct_30days",
-    "roc",
-    "rsi",
-    "MACD_Histogram_label",
-    "volume_ratio",
-    "price_band_position",
-    "zone_id",
-    "Entry_close_at_zone_end_date",
-    "Possible_exit_one_month",
-    "pct_change_one_month",
-    "profit_from_10000"
-    )
-)
 
 
 # METADATA ********************
@@ -628,22 +462,12 @@ from pyspark.sql.functions import col, when
 # Step 1: Read from your table
 df = spark.sql("""
     SELECT *
-    FROM stklakehouse.stockcontest_analysis
+    FROM stklakehouse.stocktest90days_20250816
     LIMIT 1000
 """)
 
 # Step 2: Add Success_Flag based on your success criteria
-df_with_flag = df.withColumn(
-    "Success_Flag",
-    when(
-        (col("roc") >= 1) & (col("roc") <= 2) &
-        (col("rsi") > 50) &
-        (col("MACD_Histogram_label") == "Positive (Bullish)") &
-        (col("volume_ratio") > 1) &
-        (col("price_band_position") > 0.8),
-        "Yes"
-    ).otherwise("No")
-)
+df_with_flag = df
 
 # Step 3: Display the updated DataFrame
 display(df_with_flag)
@@ -663,7 +487,7 @@ from pyspark.sql import functions as F
 scored = (
     df_with_flag
     # Normalize MACD label once
-    .withColumn("macd_label_norm", F.lower(F.col("MACD_Histogram_label")))
+    .withColumn("macd_label_norm", F.lower(F.col("MACD_Histogram_Label")))
     .withColumn("macd_bullish", F.col("macd_label_norm").contains("positive"))
     .withColumn("macd_neutral", F.col("macd_label_norm").contains("neutral"))
 
@@ -698,9 +522,9 @@ scored = (
     # Volume ratio score
     .withColumn(
         "volume_score",
-        F.when(F.col("volume_ratio") >= 1.5, 15)
-         .when(F.col("volume_ratio") >= 1.0, 10)
-         .when(F.col("volume_ratio") >= 0.8, 0)
+        F.when(F.col("volume_ratio_5d/30d") >= 1.5, 15)
+         .when(F.col("volume_ratio_5d/30d") >= 1.0, 10)
+         .when(F.col("volume_ratio_5d/30d") >= 0.8, 0)
          .otherwise(-5)
     )
 
@@ -717,7 +541,7 @@ scored = (
     .withColumn(
         "Success_Score_raw",
         F.col("roc_score") + F.col("rsi_score") + F.col("macd_score")
-        + F.col("volume_score") + F.col("band_score")
+        + F.col("volume_ratio_5d/30d") + F.col("band_score")
     )
     .withColumn(
         "Success_Score",
@@ -735,17 +559,7 @@ scored = (
 
 # Show all original columns + the new scoring columns
 display(scored)
-scored.write.format("delta").mode("overwrite").saveAsTable("stklakehouse.ScoreTable")
-
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
+scored.write.format("delta").mode("overwrite").saveAsTable("stklakehouse.ScoreTable90Days")
 
 
 # METADATA ********************

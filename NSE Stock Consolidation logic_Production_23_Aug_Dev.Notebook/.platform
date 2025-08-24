@@ -2,11 +2,11 @@
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
     "type": "Notebook",
-    "displayName": "Stocks With Rating Without Eval Logic",
+    "displayName": "NSE Stock Consolidation logic_Production_23_Aug_Dev",
     "description": "New notebook"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "09f8fde5-3232-a90e-4e4e-6406f2e38f31"
+    "logicalId": "63e75fd5-a2c7-8612-4f18-4fb3e3caf602"
   }
 }

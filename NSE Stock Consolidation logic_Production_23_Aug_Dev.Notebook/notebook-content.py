@@ -16,10 +16,6 @@
 # META           "id": "92d28ad0-2830-4644-a41e-9ff49b3759e7"
 # META         }
 # META       ]
-# META     },
-# META     "environment": {
-# META       "environmentId": "fb0e7c3c-d269-ad20-4876-37963bb236f2",
-# META       "workspaceId": "00000000-0000-0000-0000-000000000000"
 # META     }
 # META   }
 # META }
@@ -177,18 +173,20 @@ def process_stock(instrument_key: str, stock_name: str, stock_from_date: str, st
         df = spark.createDataFrame(candles, schema)
         df = df.withColumn("datetime", to_timestamp("datetime"))
         df = df.withColumn("datetime_ist", date_add(col("datetime"), 1))
-        display(df.count())
+        # display(df)
 
         # Step 3: Calculate Rolling Stats
         windowSpec_30 = Window.orderBy("datetime_ist").rowsBetween(-29, 0)
         windowSpec_5 = Window.orderBy("datetime_ist").rowsBetween(-4, 0)
 
+        # To find the consolidation(<5% - narrow)
         df = df.withColumn("rolling_high", spark_max("high").over(windowSpec_30))
         df = df.withColumn("rolling_low", spark_min("low").over(windowSpec_30))
         df = df.withColumn("rolling_avg_close", avg("close").over(windowSpec_30))
         df = df.withColumn("rolling_range_pct", ((col("rolling_high") - col("rolling_low")) / col("rolling_avg_close")) * 100)
         df = df.withColumn("rows_in_window", count("*").over(windowSpec_30))
         
+        # TO find the RSI
 
         # Step 3.1: Calculate RSI (14-day)
         windowSpec_14 = Window.orderBy("datetime_ist").rowsBetween(-13, 0)
@@ -209,12 +207,13 @@ def process_stock(instrument_key: str, stock_name: str, stock_from_date: str, st
         df = df.withColumn("rs", when(col("avg_loss") == 0, lit(None)).otherwise(col("avg_gain") / col("avg_loss")))
         df = df.withColumn("rsi", when(col("rs").isNull(), 100.0).otherwise(100 - (100 / (1 + col("rs")))))
 
+        # Volume ratio of last 30 days vol and 5 days vol
         # Step 3.2
         # ✅ New: Add avg volume & ratio
         df = df.withColumn("avg_volume_30", avg("volume").over(windowSpec_30))
         df = df.withColumn("avg_volume_5", avg("volume").over(windowSpec_5))
         df = df.withColumn("volume_ratio", col("avg_volume_5") / col("avg_volume_30"))
-       
+        #display(df)
 
         # Step 3.3: Calculate MACD Histogram Label (without retaining intermediate columns)
         short_ema_span = 12
@@ -298,6 +297,7 @@ def process_stock(instrument_key: str, stock_name: str, stock_from_date: str, st
             .withColumn("instrument_key", lit(instrument_key))
             .withColumn("stock_name", lit(stock_name))
         )
+        display(latest_df)
 
         return latest_df
 
@@ -323,7 +323,7 @@ import pytz  # ✅ For IST timezone support
 import time  # ✅ For handling delay
 
 # Step 1: Load stocks from the table
-stock_list_df = spark.read.table("nse_symbol_inst") #add limit here for test
+stock_list_df = spark.read.table("nse_symbol_inst").limit(5) #add limit here for test
 print(f"Total stocks to process: {stock_list_df.count()}")
 
 stock_tuples = [(row['instrument_key'], row['name']) for row in stock_list_df.collect()]
@@ -339,7 +339,7 @@ print(f"Date range set from {stock_from_date} to {stock_to_date}")
 # Step 3: Process each stock with throttling
 results = []
 requests_per_min = 300
-delay_seconds = 0.2  # made it one sec - earlier comment: 0.2 seconds delay between requests (original value: 60 / requests_per_min)
+delay_seconds = 1  # made it one sec - earlier comment: 0.2 seconds delay between requests (original value: 60 / requests_per_min)
 
 for index, (key, name) in enumerate(stock_tuples, start=1):
     print(f"Processing {index}/{len(stock_tuples)}: {key} ({name})")
@@ -392,7 +392,7 @@ if results:
 )
 
     # Create a dynamic table name with date suffix
-    table_name = f"StockConTest_{today_date}"
+    table_name = f"StockConTestNew5_{today_date}"
 
     finalzonestocWithFlag.write \
     .format("delta") \
@@ -427,7 +427,7 @@ import time
 # -------------------
 # CONFIG
 # -------------------
-API_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2OGE5NzdkYjFkMGM2OTA4OGM3ZTM4MDUiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NTkzNjczMSwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU1OTg2NDAwfQ.YDWv6t50Kag_AQPQTtd0QC1sO2Sg7W0gX-a75svjd8g"  # Replace with your token
+API_TOKEN = "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.eyJzdWIiOiI3REFWOTMiLCJqdGkiOiI2OGEwNjAwMDcxMDE2ZTI0OTlkNTA2YzIiLCJpc011bHRpQ2xpZW50IjpmYWxzZSwiaXNQbHVzUGxhbiI6ZmFsc2UsImlhdCI6MTc1NTM0MDgwMCwiaXNzIjoidWRhcGktZ2F0ZXdheS1zZXJ2aWNlIiwiZXhwIjoxNzU1MzgxNjAwfQ.aI6vuIuuFZcTv0FygD89EyucVDYC3Gv-hwTtOGUqX_U"  # Replace with your token
 BASE_URL = "https://api.upstox.com/v3/historical-candle"
 MAX_CALLS_PER_MIN = 10  # Adjust to your API rate limit
 
@@ -440,7 +440,6 @@ df = spark.sql(f"""
         rolling_range_pct_30days,
         roc,
         rsi,
-        _macd,
         MACD_Histogram_Label,
         `volume_ratio_5d/30d` AS volume_ratio,
         price_band_position,
@@ -511,7 +510,6 @@ for row in df.collect():
         "rolling_range_pct_30days": row.rolling_range_pct_30days,
         "roc": row.roc,
         "rsi": row.rsi,
-        "_macd":row._macd,
         "MACD_Histogram_label": row.MACD_Histogram_Label,
         "volume_ratio": row.volume_ratio,
         "price_band_position": row.price_band_position,
@@ -539,7 +537,6 @@ final_df = final_df.select(
     "rolling_range_pct_30days",
     "roc",
     "rsi",
-    "_macd",
     "MACD_Histogram_label",
     "volume_ratio",
     "price_band_position",
@@ -553,7 +550,7 @@ final_df = final_df.select(
 # -------------------
 # Save to Delta Table
 # -------------------
-final_df.write.format("delta").mode("overwrite").saveAsTable("stklakehouse.stkanalysis_23_08")
+final_df.write.format("delta").mode("overwrite").saveAsTable("stklakehouse.stockcontest_analysis")
 
 # Display with pretty aliases
 display(
@@ -563,7 +560,6 @@ display(
     "rolling_range_pct_30days",
     "roc",
     "rsi",
-    "_macd",
     "MACD_Histogram_label",
     "volume_ratio",
     "price_band_position",
@@ -574,16 +570,6 @@ display(
     "profit_from_10000"
     )
 )
-
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
 
 
 # METADATA ********************
@@ -672,9 +658,7 @@ display(df_with_flag)
 
 # META {
 # META   "language": "python",
-# META   "language_group": "synapse_pyspark",
-# META   "frozen": true,
-# META   "editable": false
+# META   "language_group": "synapse_pyspark"
 # META }
 
 # CELL ********************
@@ -763,25 +747,11 @@ scored.write.format("delta").mode("overwrite").saveAsTable("stklakehouse.ScoreTa
 
 # META {
 # META   "language": "python",
-# META   "language_group": "synapse_pyspark",
-# META   "frozen": true,
-# META   "editable": false
-# META }
-
-# CELL ********************
-
-
-# METADATA ********************
-
-# META {
-# META   "language": "python",
 # META   "language_group": "synapse_pyspark"
 # META }
 
 # CELL ********************
 
-df = spark.sql("SELECT * FROM stklakehouse.last3yeardata LIMIT 1000")
-display(df)
 
 # METADATA ********************
 

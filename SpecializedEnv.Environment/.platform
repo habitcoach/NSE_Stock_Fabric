@@ -1,12 +1,12 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
-    "type": "Notebook",
-    "displayName": "Stocks With Rating Without Eval Logic",
-    "description": "New notebook"
+    "type": "Environment",
+    "displayName": "SpecializedEnv",
+    "description": "Environment"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "09f8fde5-3232-a90e-4e4e-6406f2e38f31"
+    "logicalId": "fb0e7c3c-d269-ad20-4876-37963bb236f2"
   }
 }
